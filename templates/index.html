@@ -1,709 +1,1429 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>DNS Resolver & Caching System</title>
 
     <style>
-
         * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #080b10;
+            --bg-secondary: #0d1117;
+            --card: #11161d;
+            --card-hover: #151b23;
+            --border: #222a35;
+
+            --text: #f3f6fa;
+            --text-secondary: #9ba7b5;
+            --text-muted: #687585;
+
+            --blue: #3b82f6;
+            --blue-dark: #2563eb;
+            --blue-soft: rgba(59, 130, 246, 0.12);
+
+            --green: #22c55e;
+            --green-soft: rgba(34, 197, 94, 0.12);
+
+            --red: #ef4444;
+            --red-soft: rgba(239, 68, 68, 0.12);
+
+            --orange: #f59e0b;
+            --orange-soft: rgba(245, 158, 11, 0.12);
+
+            --shadow: 0 12px 35px rgba(0, 0, 0, 0.28);
         }
 
         body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            color: #222;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background:
+                radial-gradient(
+                    circle at top right,
+                    rgba(37, 99, 235, 0.08),
+                    transparent 30%
+                ),
+                var(--bg);
+
+            color: var(--text);
+            min-height: 100vh;
         }
 
-        header {
-            background: #1f2937;
-            color: white;
-            padding: 25px;
-            text-align: center;
+        /* ================= HEADER ================= */
+
+        .header {
+            background:
+                linear-gradient(
+                    135deg,
+                    #0a0f18,
+                    #0d1624
+                );
+
+            border-bottom: 1px solid var(--border);
+            padding: 26px 6%;
         }
 
-        header h1 {
-            margin: 0;
-            font-size: 28px;
+        .header-content {
+            max-width: 1400px;
+            margin: auto;
         }
 
-        header p {
-            margin-top: 8px;
-            color: #d1d5db;
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
+
+        .brand-icon {
+            width: 50px;
+            height: 50px;
+
+            border-radius: 13px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 25px;
+
+            background: var(--blue-soft);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+
+            box-shadow:
+                0 0 25px rgba(59, 130, 246, 0.08);
+        }
+
+        .brand h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .brand p {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            margin-top: 17px;
+
+            padding: 7px 12px;
+
+            border-radius: 20px;
+
+            background: var(--green-soft);
+            border: 1px solid rgba(34, 197, 94, 0.15);
+
+            color: #7ee2a1;
+
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+
+            border-radius: 50%;
+
+            background: var(--green);
+
+            box-shadow:
+                0 0 8px rgba(34, 197, 94, 0.7);
+        }
+
+        /* ================= MAIN ================= */
 
         .container {
-            width: 90%;
-            max-width: 1200px;
-            margin: 30px auto;
+            width: 88%;
+            max-width: 1400px;
+
+            margin: 30px auto 50px;
         }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+
+            margin-bottom: 7px;
+        }
+
+        .section-subtitle {
+            color: var(--text-secondary);
+
+            font-size: 12px;
+
+            margin-bottom: 17px;
+        }
+
+        /* ================= CARDS ================= */
 
         .card {
-            background: white;
-            padding: 25px;
+            background: var(--card);
+
+            border: 1px solid var(--border);
+
+            border-radius: 14px;
+
+            box-shadow: var(--shadow);
+
+            transition:
+                border-color 0.2s,
+                transform 0.2s;
+        }
+
+        .card:hover {
+            border-color: #2c3745;
+        }
+
+        /* ================= QUERY ================= */
+
+        .query-card {
+            padding: 23px;
+
             margin-bottom: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
-        .card h2 {
-            margin-top: 0;
-            color: #1f2937;
-        }
-
-        .input-section {
+        .query-row {
             display: flex;
-            gap: 10px;
-            margin-top: 15px;
+            gap: 11px;
         }
 
-        input {
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 15px;
+        .query-input {
             flex: 1;
+
+            height: 48px;
+
+            background: #0b1016;
+
+            color: var(--text);
+
+            border: 1px solid var(--border);
+
+            border-radius: 9px;
+
+            padding: 0 15px;
+
+            font-size: 13px;
+
+            outline: none;
+
+            transition: 0.2s;
         }
 
-        button {
-            padding: 12px 18px;
+        .query-input::placeholder {
+            color: #596574;
+        }
+
+        .query-input:focus {
+            border-color: var(--blue);
+
+            box-shadow:
+                0 0 0 3px rgba(59, 130, 246, 0.09);
+        }
+
+        /* ================= BUTTONS ================= */
+
+        .btn {
+            height: 48px;
+
+            padding: 0 20px;
+
             border: none;
-            border-radius: 6px;
+
+            border-radius: 9px;
+
+            font-size: 12px;
+
+            font-weight: 650;
+
             cursor: pointer;
-            background: #2563eb;
+
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--blue);
+
             color: white;
-            font-size: 14px;
         }
 
-        button:hover {
-            background: #1d4ed8;
+        .btn-primary:hover {
+            background: var(--blue-dark);
+
+            transform: translateY(-1px);
+
+            box-shadow:
+                0 7px 20px rgba(37, 99, 235, 0.18);
         }
 
-        .danger {
-            background: #dc2626;
+        .btn-secondary {
+            background: #171e27;
+
+            border: 1px solid var(--border);
+
+            color: #d6dce5;
         }
 
-        .danger:hover {
-            background: #b91c1c;
+        .btn-secondary:hover {
+            background: #1d2631;
+
+            border-color: #344050;
         }
 
-        .secondary {
-            background: #4b5563;
-        }
+        /* ================= RESULT ================= */
 
-        .secondary:hover {
-            background: #374151;
-        }
-
-        .result {
-            margin-top: 20px;
-            padding: 18px;
-            background: #f9fafb;
-            border-left: 5px solid #2563eb;
-            border-radius: 5px;
+        .result-card {
             display: none;
+
+            margin-bottom: 25px;
+
+            overflow: hidden;
         }
 
-        .result-row {
-            margin: 8px 0;
+        .result-header {
+            padding: 15px 20px;
+
+            border-bottom: 1px solid var(--border);
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
         }
 
-        .result-label {
-            font-weight: bold;
+        .result-title {
+            font-size: 13px;
+
+            font-weight: 700;
+        }
+
+        .result-status {
+            padding: 6px 10px;
+
+            border-radius: 6px;
+
+            font-size: 10px;
+
+            font-weight: 750;
         }
 
         .hit {
-            color: #15803d;
-            font-weight: bold;
+            background: var(--green-soft);
+
+            color: #55d982;
+
+            border: 1px solid rgba(34, 197, 94, 0.14);
         }
 
         .miss {
-            color: #dc2626;
-            font-weight: bold;
+            background: var(--red-soft);
+
+            color: #ff7373;
+
+            border: 1px solid rgba(239, 68, 68, 0.14);
         }
+
+        .result-body {
+            padding: 19px;
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 13px;
+        }
+
+        .result-item {
+            padding: 15px;
+
+            background: #0d1218;
+
+            border: 1px solid var(--border);
+
+            border-radius: 9px;
+        }
+
+        .result-label {
+            color: var(--text-muted);
+
+            font-size: 9px;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.7px;
+
+            margin-bottom: 8px;
+        }
+
+        .result-value {
+            color: var(--text);
+
+            font-size: 14px;
+
+            font-weight: 700;
+
+            word-break: break-word;
+        }
+
+        /* ================= STATISTICS ================= */
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-top: 20px;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 13px;
+
+            margin-bottom: 27px;
         }
 
-        .stat-box {
-            background: #f9fafb;
+        .stat-card {
             padding: 18px;
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid #e5e7eb;
+
+            position: relative;
+
+            overflow: hidden;
         }
 
-        .stat-title {
-            font-size: 14px;
-            color: #6b7280;
+        .stat-label {
+            color: var(--text-secondary);
+
+            font-size: 11px;
+
+            margin-bottom: 9px;
         }
 
         .stat-value {
             font-size: 24px;
-            font-weight: bold;
-            margin-top: 8px;
-            color: #111827;
+
+            font-weight: 750;
+
+            letter-spacing: -0.5px;
         }
 
-        .management {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
+        .stat-description {
+            color: var(--text-muted);
+
+            font-size: 10px;
+
+            margin-top: 6px;
         }
 
-        .management input {
-            flex: 0 0 180px;
+        .stat-accent {
+            position: absolute;
+
+            right: -22px;
+
+            bottom: -25px;
+
+            width: 80px;
+            height: 80px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(59, 130, 246, 0.055);
         }
+
+        /* ================= TWO COLUMN ================= */
+
+        .two-column {
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr;
+
+            gap: 18px;
+
+            margin-bottom: 23px;
+        }
+
+        .panel {
+            padding: 21px;
+        }
+
+        .panel-header {
+            margin-bottom: 17px;
+        }
+
+        .panel-title {
+            font-size: 14px;
+
+            font-weight: 700;
+        }
+
+        .panel-description {
+            color: var(--text-muted);
+
+            font-size: 11px;
+
+            margin-top: 5px;
+        }
+
+        /* ================= PERFORMANCE ================= */
 
         .performance-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-top: 20px;
+
+            grid-template-columns:
+                repeat(3, 1fr);
+
+            gap: 11px;
         }
 
         .performance-box {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            padding: 20px;
+            padding: 16px;
+
+            background: #0c1117;
+
+            border: 1px solid var(--border);
+
+            border-radius: 9px;
+        }
+
+        .performance-box .label {
+            color: var(--text-muted);
+
+            font-size: 9px;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.5px;
+
+            margin-bottom: 8px;
+        }
+
+        .performance-box .value {
+            font-size: 19px;
+
+            font-weight: 750;
+        }
+
+        .improvement {
+            color: var(--green);
+        }
+
+        .info-box {
+            margin-top: 13px;
+
+            padding: 12px 14px;
+
+            background: var(--blue-soft);
+
+            border-left: 3px solid var(--blue);
+
+            border-radius: 6px;
+
+            color: #8491a3;
+
+            font-size: 10px;
+
+            line-height: 1.6;
+        }
+
+        /* ================= CACHE MANAGEMENT ================= */
+
+        .management-row {
+            display: flex;
+
+            gap: 9px;
+
+            margin-bottom: 10px;
+        }
+
+        .small-input {
+            flex: 1;
+
+            height: 40px;
+
+            background: #0b1016;
+
+            color: var(--text);
+
+            border: 1px solid var(--border);
+
             border-radius: 8px;
-            text-align: center;
+
+            padding: 0 11px;
+
+            outline: none;
+
+            font-size: 12px;
         }
 
-        .performance-box h3 {
-            margin-top: 0;
-            font-size: 16px;
-            color: #4b5563;
+        .small-input:focus {
+            border-color: var(--blue);
         }
 
-        .performance-value {
-            font-size: 25px;
-            font-weight: bold;
-            color: #111827;
+        .small-btn {
+            height: 40px;
+
+            padding: 0 14px;
+
+            border: none;
+
+            border-radius: 8px;
+
+            cursor: pointer;
+
+            font-size: 11px;
+
+            font-weight: 650;
+        }
+
+        .management-note {
+            color: var(--text-muted);
+
+            font-size: 10px;
+
+            line-height: 1.5;
+
+            margin-top: 12px;
+        }
+
+        /* ================= GRAPH ================= */
+
+        .graph-card {
+            padding: 21px;
+
+            margin-bottom: 24px;
         }
 
         .graph-container {
-            margin-top: 25px;
-            background: #fafafa;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 20px;
+            position: relative;
+
+            height: 340px;
+
+            margin-top: 15px;
+
+            border: 1px solid var(--border);
+
+            border-radius: 10px;
+
+            background:
+                #0b1016;
+
+            overflow: hidden;
         }
 
-        .graph-container h3 {
-            margin-top: 0;
-            color: #374151;
-        }
-
-        canvas {
+        #responseGraph {
             width: 100%;
-            height: 350px;
+            height: 100%;
+
             display: block;
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 5px;
         }
 
-        .note {
-            margin-top: 15px;
-            padding: 12px;
-            background: #eff6ff;
-            border-left: 4px solid #2563eb;
-            color: #374151;
-            font-size: 14px;
-            line-height: 1.5;
+        .graph-legend {
+            display: flex;
+
+            gap: 20px;
+
+            margin-top: 11px;
+
+            color: var(--text-muted);
+
+            font-size: 10px;
         }
 
-        .message {
-            margin-top: 15px;
-            padding: 12px;
-            display: none;
-            border-radius: 5px;
-            background: #f3f4f6;
+        .legend-item {
+            display: flex;
+
+            align-items: center;
+
+            gap: 6px;
         }
 
-        @media (max-width: 900px) {
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+        }
+
+        .legend-hit {
+            background: var(--green);
+
+            box-shadow:
+                0 0 7px rgba(34, 197, 94, 0.4);
+        }
+
+        .legend-miss {
+            background: var(--red);
+
+            box-shadow:
+                0 0 7px rgba(239, 68, 68, 0.35);
+        }
+
+        /* ================= FOOTER ================= */
+
+        footer {
+            text-align: center;
+
+            color: #566171;
+
+            font-size: 10px;
+
+            padding: 10px 0 25px;
+        }
+
+        /* ================= TOAST ================= */
+
+        .toast {
+            position: fixed;
+
+            right: 24px;
+            bottom: 24px;
+
+            padding: 12px 16px;
+
+            border-radius: 9px;
+
+            background: #171e27;
+
+            border: 1px solid #2d3744;
+
+            color: white;
+
+            font-size: 11px;
+
+            box-shadow:
+                0 10px 35px rgba(0,0,0,0.4);
+
+            opacity: 0;
+
+            transform:
+                translateY(12px);
+
+            pointer-events: none;
+
+            transition: 0.25s;
+
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+
+            transform:
+                translateY(0);
+        }
+
+        /* ================= RESPONSIVE ================= */
+
+        @media (max-width: 1000px) {
 
             .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+            .result-body {
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 650px) {
+
+            .container {
+                width: 92%;
+            }
+
+            .header {
+                padding: 22px 4%;
+            }
+
+            .brand h1 {
+                font-size: 20px;
+            }
+
+            .query-row {
+                flex-direction: column;
+            }
+
+            .query-input,
+            .btn {
+                width: 100%;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .result-body {
+                grid-template-columns: 1fr;
             }
 
             .performance-grid {
                 grid-template-columns: 1fr;
             }
 
-        }
-
-        @media (max-width: 600px) {
-
-            .container {
-                width: 95%;
-            }
-
-            .input-section {
+            .management-row {
                 flex-direction: column;
             }
 
-            .stats-grid {
-                grid-template-columns: 1fr;
+            .small-btn {
+                width: 100%;
             }
-
-            .management {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .management input {
-                flex: 1;
-            }
-
         }
-
     </style>
-
 </head>
 
 
 <body>
 
-<header>
+<!-- ================= HEADER ================= -->
 
-    <h1>DNS Resolver & Caching System</h1>
+<header class="header">
 
-    <p>
-        DNS Resolution with TTL-Based Caching and Performance Analysis
-    </p>
+    <div class="header-content">
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                🌐
+            </div>
+
+            <div>
+
+                <h1>
+                    DNS Resolver & Caching System
+                </h1>
+
+                <p>
+                    TTL-based DNS resolution and cache performance analysis
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="status-badge">
+
+            <span class="status-dot"></span>
+
+            Resolver Online
+
+        </div>
+
+    </div>
 
 </header>
 
 
-<div class="container">
+<!-- ================= MAIN ================= -->
+
+<main class="container">
 
 
-    <!-- DNS RESOLUTION -->
+    <!-- DNS QUERY -->
 
-    <div class="card">
+    <section class="card query-card">
 
-        <h2>DNS Resolution</h2>
+        <div class="section-title">
+            DNS Resolution
+        </div>
 
-        <p>
-            Enter a domain name to resolve it using the DNS resolver.
-        </p>
+        <div class="section-subtitle">
+            Enter a domain name to resolve it through the local DNS resolver.
+        </div>
 
-        <div class="input-section">
+        <div class="query-row">
 
             <input
                 type="text"
                 id="domainInput"
+                class="query-input"
                 placeholder="Enter domain name e.g. google.com"
+                autocomplete="off"
             >
-
-            <button onclick="resolveDomain()">
-                Resolve
-            </button>
-
-        </div>
-
-
-        <div class="result" id="resultBox">
-
-            <div class="result-row">
-                <span class="result-label">
-                    Status:
-                </span>
-
-                <span id="resultStatus"></span>
-            </div>
-
-
-            <div class="result-row">
-
-                <span class="result-label">
-                    Domain:
-                </span>
-
-                <span id="resultDomain"></span>
-
-            </div>
-
-
-            <div class="result-row">
-
-                <span class="result-label">
-                    IP Address:
-                </span>
-
-                <span id="resultIP"></span>
-
-            </div>
-
-
-            <div class="result-row">
-
-                <span class="result-label">
-                    Response Time:
-                </span>
-
-                <span id="resultTime"></span>
-
-            </div>
-
-
-            <div class="result-row">
-
-                <span class="result-label">
-                    TTL:
-                </span>
-
-                <span id="resultTTL"></span>
-
-            </div>
-
-
-            <div class="result-row">
-
-                <span class="result-label">
-                    TTL Remaining:
-                </span>
-
-                <span id="resultTTLRemaining"></span>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-
-    <!-- CACHE STATISTICS -->
-
-    <div class="card">
-
-        <h2>Cache Statistics</h2>
-
-        <div class="stats-grid">
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    Total Queries
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="totalQueries">
-                    -
-                </div>
-
-            </div>
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    Cache Hits
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="cacheHits">
-                    -
-                </div>
-
-            </div>
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    Cache Misses
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="cacheMisses">
-                    -
-                </div>
-
-            </div>
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    Cache Hit Ratio
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="hitRatio">
-                    -
-                </div>
-
-            </div>
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    DNS Queries Sent
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="dnsQueries">
-                    -
-                </div>
-
-            </div>
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    Average DNS Response Time
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="averageTime">
-                    -
-                </div>
-
-            </div>
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    Current Cache Size
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="currentCacheSize">
-                    -
-                </div>
-
-            </div>
-
-
-            <div class="stat-box">
-
-                <div class="stat-title">
-                    Maximum Cache Size
-                </div>
-
-                <div
-                    class="stat-value"
-                    id="maximumCacheSize">
-                    -
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <br>
-
-        <button onclick="updateStats()">
-            Refresh Statistics
-        </button>
-
-    </div>
-
-
-
-    <!-- CACHE MANAGEMENT -->
-
-    <div class="card">
-
-        <h2>Cache Management</h2>
-
-        <div class="management">
-
-            <input
-                type="number"
-                id="cacheSizeInput"
-                placeholder="Cache size"
-                min="1"
-            >
-
-            <button onclick="setCacheSize()">
-                Set Cache Size
-            </button>
 
             <button
-                class="danger"
-                onclick="clearCache()">
-                Clear Cache
+                class="btn btn-primary"
+                onclick="resolveDomain()"
+            >
+                Resolve Domain
             </button>
 
         </div>
 
+    </section>
 
-        <div
-            class="message"
-            id="managementMessage">
+
+    <!-- DNS RESULT -->
+
+    <section
+        id="resultCard"
+        class="card result-card"
+    >
+
+        <div class="result-header">
+
+            <div class="result-title">
+                Latest DNS Response
+            </div>
+
+            <div
+                id="resultStatus"
+                class="result-status"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="result-body">
+
+            <div class="result-item">
+
+                <div class="result-label">
+                    Domain
+                </div>
+
+                <div
+                    id="resultDomain"
+                    class="result-value"
+                >
+                    -
+                </div>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <div class="result-label">
+                    IP Address
+                </div>
+
+                <div
+                    id="resultIP"
+                    class="result-value"
+                >
+                    -
+                </div>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <div class="result-label">
+                    Response Time
+                </div>
+
+                <div
+                    id="resultTime"
+                    class="result-value"
+                >
+                    -
+                </div>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <div class="result-label">
+                    TTL
+                </div>
+
+                <div
+                    id="resultTTL"
+                    class="result-value"
+                >
+                    -
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- STATISTICS -->
+
+    <div class="section-title">
+        Resolver Statistics
+    </div>
+
+
+    <div class="stats-grid">
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                Total Queries
+            </div>
+
+            <div
+                id="totalQueries"
+                class="stat-value"
+            >
+                0
+            </div>
+
+            <div class="stat-description">
+                Requests received
+            </div>
+
+            <div class="stat-accent"></div>
+
+        </div>
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                Cache Hits
+            </div>
+
+            <div
+                id="cacheHits"
+                class="stat-value"
+            >
+                0
+            </div>
+
+            <div class="stat-description">
+                Served from cache
+            </div>
+
+            <div class="stat-accent"></div>
+
+        </div>
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                Cache Misses
+            </div>
+
+            <div
+                id="cacheMisses"
+                class="stat-value"
+            >
+                0
+            </div>
+
+            <div class="stat-description">
+                Required DNS lookup
+            </div>
+
+            <div class="stat-accent"></div>
+
+        </div>
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                Cache Hit Ratio
+            </div>
+
+            <div
+                id="hitRatio"
+                class="stat-value"
+            >
+                0%
+            </div>
+
+            <div class="stat-description">
+                Cache effectiveness
+            </div>
+
+            <div class="stat-accent"></div>
+
+        </div>
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                DNS Queries Sent
+            </div>
+
+            <div
+                id="dnsQueries"
+                class="stat-value"
+            >
+                0
+            </div>
+
+            <div class="stat-description">
+                External DNS requests
+            </div>
+
+            <div class="stat-accent"></div>
+
+        </div>
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                Average DNS Time
+            </div>
+
+            <div
+                id="avgTime"
+                class="stat-value"
+            >
+                0 ms
+            </div>
+
+            <div class="stat-description">
+                Average external lookup
+            </div>
+
+            <div class="stat-accent"></div>
+
+        </div>
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                Current Cache
+            </div>
+
+            <div
+                id="cacheSize"
+                class="stat-value"
+            >
+                0
+            </div>
+
+            <div class="stat-description">
+                Stored domains
+            </div>
+
+            <div class="stat-accent"></div>
+
+        </div>
+
+
+        <div class="card stat-card">
+
+            <div class="stat-label">
+                Maximum Cache
+            </div>
+
+            <div
+                id="maxCache"
+                class="stat-value"
+            >
+                10
+            </div>
+
+            <div class="stat-description">
+                Configured capacity
+            </div>
+
+            <div class="stat-accent"></div>
+
         </div>
 
     </div>
 
 
+    <!-- PERFORMANCE + CACHE -->
 
-    <!-- PERFORMANCE COMPARISON -->
-
-    <div class="card">
-
-        <h2>Performance Comparison</h2>
-
-        <div class="performance-grid">
+    <div class="two-column">
 
 
-            <div class="performance-box">
+        <!-- PERFORMANCE -->
 
-                <h3>
-                    Last Cache MISS Response Time
-                </h3>
+        <section class="card panel">
 
-                <div
-                    class="performance-value"
-                    id="lastMissTime">
-                    -
+            <div class="panel-header">
+
+                <div class="panel-title">
+                    Performance Comparison
+                </div>
+
+                <div class="panel-description">
+                    Actual response times measured during recent requests.
                 </div>
 
             </div>
 
 
-            <div class="performance-box">
+            <div class="performance-grid">
 
-                <h3>
-                    Last Cache HIT Response Time
-                </h3>
 
-                <div
-                    class="performance-value"
-                    id="lastHitTime">
-                    -
+                <div class="performance-box">
+
+                    <div class="label">
+                        Last CACHE MISS
+                    </div>
+
+                    <div
+                        id="lastMissTime"
+                        class="value"
+                    >
+                        -
+                    </div>
+
+                </div>
+
+
+                <div class="performance-box">
+
+                    <div class="label">
+                        Last CACHE HIT
+                    </div>
+
+                    <div
+                        id="lastHitTime"
+                        class="value"
+                    >
+                        -
+                    </div>
+
+                </div>
+
+
+                <div class="performance-box">
+
+                    <div class="label">
+                        Response Improvement
+                    </div>
+
+                    <div
+                        id="improvement"
+                        class="value improvement"
+                    >
+                        -
+                    </div>
+
                 </div>
 
             </div>
 
 
-            <div class="performance-box">
+            <div class="info-box">
 
-                <h3>
-                    Response Time Improvement
-                </h3>
+                Response improvement is calculated from the latest measured
+                CACHE MISS and CACHE HIT response times. Actual values can
+                vary depending on network and DNS conditions.
 
-                <div
-                    class="performance-value"
-                    id="improvement">
-                    -
+            </div>
+
+        </section>
+
+
+        <!-- CACHE MANAGEMENT -->
+
+        <section class="card panel">
+
+            <div class="panel-header">
+
+                <div class="panel-title">
+                    Cache Management
                 </div>
 
+                <div class="panel-description">
+                    Configure and control the resolver cache.
+                </div>
+
+            </div>
+
+
+            <div class="management-row">
+
+                <input
+                    type="number"
+                    id="cacheSizeInput"
+                    class="small-input"
+                    placeholder="Maximum cache size"
+                    min="1"
+                >
+
+                <button
+                    class="small-btn btn-primary"
+                    onclick="setCacheSize()"
+                >
+                    Set Size
+                </button>
+
+            </div>
+
+
+            <div class="management-row">
+
+                <button
+                    class="small-btn btn-secondary"
+                    onclick="clearCache()"
+                >
+                    Clear Cache
+                </button>
+
+                <button
+                    class="small-btn btn-secondary"
+                    onclick="updateStats()"
+                >
+                    Refresh Statistics
+                </button>
+
+            </div>
+
+
+            <div class="management-note">
+
+                Changing the maximum cache size clears the current cache
+                before applying the new capacity.
+
+            </div>
+
+        </section>
+
+    </div>
+
+
+    <!-- GRAPH -->
+
+    <section class="card graph-card">
+
+        <div class="panel-header">
+
+            <div class="panel-title">
+                Response-Time Analysis
+            </div>
+
+            <div class="panel-description">
+                Live response-time measurements for recent DNS requests.
             </div>
 
         </div>
 
-
-        <div class="note">
-
-            The response time shown here is the actual
-            end-to-end time measured between the Flask web
-            application and the UDP DNS resolver.
-
-            Cache HIT and Cache MISS times may vary because
-            of system and network conditions.
-
-        </div>
-
-
-        <!-- LIVE GRAPH -->
 
         <div class="graph-container">
 
-            <h3>
-                Live DNS Response Time Graph
-            </h3>
+            <canvas id="responseGraph"></canvas>
 
-            <canvas id="responseChart"
-                    width="1000"
-                    height="350">
-            </canvas>
+        </div>
 
-            <div class="note">
 
-                Each point represents an actual DNS request
-                processed by the resolver. Green points
-                represent cache hits and red points represent
-                cache misses.
+        <div class="graph-legend">
+
+            <div class="legend-item">
+
+                <span
+                    class="legend-dot legend-hit"
+                ></span>
+
+                CACHE HIT
+
+            </div>
+
+
+            <div class="legend-item">
+
+                <span
+                    class="legend-dot legend-miss"
+                ></span>
+
+                CACHE MISS
 
             </div>
 
         </div>
 
-    </div>
+    </section>
+
+</main>
 
 
-</div>
+<!-- ================= FOOTER ================= -->
+
+<footer>
+
+    DNS Resolver & Caching System
+    ·
+    Computer Networks Mini Project
+
+</footer>
 
 
+<!-- ================= TOAST ================= -->
+
+<div
+    id="toast"
+    class="toast"
+></div>
+
+
+<!-- ================= JAVASCRIPT ================= -->
 
 <script>
-
-
-    // --------------------------------------------------
-    // VARIABLES FOR PERFORMANCE TRACKING
-    // --------------------------------------------------
 
     let lastMissTime = null;
 
     let lastHitTime = null;
 
-
-    // Store recent response times for graph
-
-    let responseHistory = [];
-
-    const MAX_GRAPH_POINTS = 20;
+    let requestHistory = [];
 
 
+    /* ================= TOAST ================= */
 
-    // --------------------------------------------------
-    // RESOLVE DOMAIN
-    // --------------------------------------------------
+    function showToast(message) {
+
+        const toast =
+            document.getElementById("toast");
+
+        toast.textContent = message;
+
+        toast.classList.add("show");
+
+        setTimeout(() => {
+
+            toast.classList.remove("show");
+
+        }, 2500);
+
+    }
+
+
+    /* ================= DNS RESOLUTION ================= */
 
     async function resolveDomain() {
 
-        const domainInput =
+        const input =
             document.getElementById(
                 "domainInput"
             );
 
         const domain =
-            domainInput.value.trim();
+            input.value.trim();
 
 
         if (!domain) {
 
-            alert(
+            showToast(
                 "Please enter a domain name."
             );
 
@@ -725,9 +1445,10 @@
                                 "application/json"
                         },
 
-                        body: JSON.stringify({
-                            domain: domain
-                        })
+                        body:
+                            JSON.stringify({
+                                domain: domain
+                            })
                     }
                 );
 
@@ -738,21 +1459,20 @@
 
             if (data.error) {
 
-                alert(data.error);
+                showToast(
+                    data.error
+                );
 
                 return;
 
             }
 
 
-            // Show result box
-
             document.getElementById(
-                "resultBox"
-            ).style.display = "block";
+                "resultCard"
+            ).style.display =
+                "block";
 
-
-            // Domain
 
             document.getElementById(
                 "resultDomain"
@@ -760,15 +1480,11 @@
                 data.domain || "-";
 
 
-            // IP
-
             document.getElementById(
                 "resultIP"
             ).textContent =
                 data.ip || "-";
 
-
-            // Response time
 
             document.getElementById(
                 "resultTime"
@@ -776,23 +1492,13 @@
                 data.response_time || "-";
 
 
-            // TTL
-
             document.getElementById(
                 "resultTTL"
             ).textContent =
-                data.ttl || "-";
+                data.ttl ||
+                data.ttl_remaining ||
+                "-";
 
-
-            // TTL remaining
-
-            document.getElementById(
-                "resultTTLRemaining"
-            ).textContent =
-                data.ttl_remaining || "-";
-
-
-            // Status
 
             const statusElement =
                 document.getElementById(
@@ -800,691 +1506,142 @@
                 );
 
 
-            statusElement.textContent =
-                data.status || "-";
-
-
-            // Detect HIT or MISS
-
-            const status =
-                (data.status || "")
-                .toUpperCase();
-
-
-            const numericTime =
+            const responseTime =
                 parseFloat(
-                    (data.response_time || "")
-                    .replace("ms", "")
-                    .trim()
+                    data.response_time
                 );
 
 
             if (
-                !isNaN(numericTime)
+                data.status ===
+                "CACHE HIT"
             ) {
 
+                statusElement.textContent =
+                    "CACHE HIT";
 
-                if (
-                    status.includes("HIT")
-                    &&
-                    !status.includes("MISS")
-                ) {
-
-                    lastHitTime =
-                        numericTime;
+                statusElement.className =
+                    "result-status hit";
 
 
-                    document.getElementById(
-                        "lastHitTime"
-                    ).textContent =
-                        numericTime.toFixed(2)
-                        + " ms";
+                lastHitTime =
+                    responseTime;
 
 
-                    addGraphPoint(
-                        "HIT",
-                        numericTime
-                    );
-
-                }
-
-
-                else if (
-                    status.includes("MISS")
-                ) {
-
-                    lastMissTime =
-                        numericTime;
-
-
-                    document.getElementById(
-                        "lastMissTime"
-                    ).textContent =
-                        numericTime.toFixed(2)
-                        + " ms";
-
-
-                    addGraphPoint(
-                        "MISS",
-                        numericTime
-                    );
-
-                }
-
-
-                calculateImprovement();
+                requestHistory.push({
+                    time: responseTime,
+                    type: "HIT"
+                });
 
             }
 
+            else {
 
-            // Style status
+                statusElement.textContent =
+                    "CACHE MISS";
 
-            statusElement.className = "";
+                statusElement.className =
+                    "result-status miss";
+
+
+                lastMissTime =
+                    responseTime;
+
+
+                requestHistory.push({
+                    time: responseTime,
+                    type: "MISS"
+                });
+
+            }
 
 
             if (
-                status.includes("HIT")
-                &&
-                !status.includes("MISS")
+                requestHistory.length >
+                20
             ) {
 
-                statusElement.classList.add(
-                    "hit"
-                );
-
-            }
-
-            else if (
-                status.includes("MISS")
-            ) {
-
-                statusElement.classList.add(
-                    "miss"
-                );
+                requestHistory.shift();
 
             }
 
 
-            // Update statistics
+            updatePerformance();
+
+            drawGraph();
 
             updateStats();
-
 
         }
 
         catch (error) {
 
-            alert(
-                "Error communicating with server."
+            showToast(
+                "Unable to connect to the DNS resolver."
             );
-
-            console.error(error);
 
         }
 
     }
 
 
+    /* ================= PERFORMANCE ================= */
 
-    // --------------------------------------------------
-    // CALCULATE PERFORMANCE IMPROVEMENT
-    // --------------------------------------------------
+    function updatePerformance() {
 
-    function calculateImprovement() {
+        document.getElementById(
+            "lastMissTime"
+        ).textContent =
+            lastMissTime !== null
+                ? lastMissTime.toFixed(2) +
+                  " ms"
+                : "-";
+
+
+        document.getElementById(
+            "lastHitTime"
+        ).textContent =
+            lastHitTime !== null
+                ? lastHitTime.toFixed(2) +
+                  " ms"
+                : "-";
+
 
         if (
-            lastMissTime !== null
-            &&
-            lastHitTime !== null
-            &&
+            lastMissTime !== null &&
+            lastHitTime !== null &&
             lastMissTime > 0
         ) {
 
             const improvement =
                 (
-                    (
-                        lastMissTime
-                        -
-                        lastHitTime
-                    )
-                    /
+                    (lastMissTime -
+                    lastHitTime) /
                     lastMissTime
-                )
-                * 100;
+                ) * 100;
 
 
             document.getElementById(
                 "improvement"
             ).textContent =
-                improvement.toFixed(2)
-                + "%";
+                improvement.toFixed(2) +
+                "%";
 
         }
 
-    }
+        else {
 
-
-
-    // --------------------------------------------------
-    // ADD GRAPH POINT
-    // --------------------------------------------------
-
-    function addGraphPoint(
-        type,
-        responseTime
-    ) {
-
-
-        responseHistory.push({
-
-            type: type,
-
-            time: responseTime
-
-        });
-
-
-        if (
-            responseHistory.length
-            >
-            MAX_GRAPH_POINTS
-        ) {
-
-            responseHistory.shift();
-
-        }
-
-
-        drawGraph();
-
-    }
-
-
-
-    // --------------------------------------------------
-    // DRAW GRAPH
-    // --------------------------------------------------
-
-    function drawGraph() {
-
-        const canvas =
             document.getElementById(
-                "responseChart"
-            );
-
-
-        const ctx =
-            canvas.getContext("2d");
-
-
-        const width =
-            canvas.width;
-
-
-        const height =
-            canvas.height;
-
-
-        // Clear canvas
-
-        ctx.clearRect(
-            0,
-            0,
-            width,
-            height
-        );
-
-
-        // Background
-
-        ctx.fillStyle =
-            "#ffffff";
-
-        ctx.fillRect(
-            0,
-            0,
-            width,
-            height
-        );
-
-
-        if (
-            responseHistory.length === 0
-        ) {
-
-            ctx.fillStyle =
-                "#6b7280";
-
-            ctx.font =
-                "16px Arial";
-
-            ctx.textAlign =
-                "center";
-
-            ctx.fillText(
-                "No DNS requests recorded yet",
-                width / 2,
-                height / 2
-            );
-
-            return;
+                "improvement"
+            ).textContent =
+                "-";
 
         }
-
-
-        // --------------------------------------------------
-        // GRAPH DIMENSIONS
-        // --------------------------------------------------
-
-        const left =
-            70;
-
-        const right =
-            30;
-
-        const top =
-            30;
-
-        const bottom =
-            55;
-
-
-        const graphWidth =
-            width
-            -
-            left
-            -
-            right;
-
-
-        const graphHeight =
-            height
-            -
-            top
-            -
-            bottom;
-
-
-        // Find maximum response time
-
-        let maxTime =
-            Math.max(
-                ...responseHistory.map(
-                    point => point.time
-                )
-            );
-
-
-        if (
-            maxTime < 10
-        ) {
-
-            maxTime = 10;
-
-        }
-
-
-        maxTime =
-            Math.ceil(
-                maxTime / 10
-            )
-            * 10;
-
-
-        // --------------------------------------------------
-        // GRID LINES
-        // --------------------------------------------------
-
-        ctx.strokeStyle =
-            "#e5e7eb";
-
-        ctx.lineWidth =
-            1;
-
-
-        const gridLines =
-            5;
-
-
-        for (
-            let i = 0;
-            i <= gridLines;
-            i++
-        ) {
-
-            const y =
-                top
-                +
-                (
-                    graphHeight
-                    *
-                    i
-                    /
-                    gridLines
-                );
-
-
-            ctx.beginPath();
-
-            ctx.moveTo(
-                left,
-                y
-            );
-
-            ctx.lineTo(
-                width - right,
-                y
-            );
-
-            ctx.stroke();
-
-
-            // Y-axis labels
-
-            const value =
-                maxTime
-                *
-                (
-                    1
-                    -
-                    i / gridLines
-                );
-
-
-            ctx.fillStyle =
-                "#6b7280";
-
-            ctx.font =
-                "12px Arial";
-
-            ctx.textAlign =
-                "right";
-
-            ctx.fillText(
-                value.toFixed(0)
-                + " ms",
-                left - 10,
-                y + 4
-            );
-
-        }
-
-
-        // --------------------------------------------------
-        // AXES
-        // --------------------------------------------------
-
-        ctx.strokeStyle =
-            "#374151";
-
-        ctx.lineWidth =
-            1.5;
-
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            left,
-            top
-        );
-
-        ctx.lineTo(
-            left,
-            height - bottom
-        );
-
-        ctx.lineTo(
-            width - right,
-            height - bottom
-        );
-
-        ctx.stroke();
-
-
-        // --------------------------------------------------
-        // X-AXIS LABEL
-        // --------------------------------------------------
-
-        ctx.fillStyle =
-            "#374151";
-
-        ctx.font =
-            "13px Arial";
-
-        ctx.textAlign =
-            "center";
-
-
-        ctx.fillText(
-            "Request Number",
-            width / 2,
-            height - 15
-        );
-
-
-        // --------------------------------------------------
-        // Y-AXIS LABEL
-        // --------------------------------------------------
-
-        ctx.save();
-
-
-        ctx.translate(
-            18,
-            height / 2
-        );
-
-
-        ctx.rotate(
-            -Math.PI / 2
-        );
-
-
-        ctx.fillText(
-            "Response Time (ms)",
-            0,
-            0
-        );
-
-
-        ctx.restore();
-
-
-        // --------------------------------------------------
-        // PLOT POINTS
-        // --------------------------------------------------
-
-        const count =
-            responseHistory.length;
-
-
-        const xStep =
-            count > 1
-            ?
-            graphWidth / (count - 1)
-            :
-            graphWidth / 2;
-
-
-        responseHistory.forEach(
-            (point, index) => {
-
-
-                let x;
-
-
-                if (
-                    count === 1
-                ) {
-
-                    x =
-                        left
-                        +
-                        graphWidth / 2;
-
-                }
-
-                else {
-
-                    x =
-                        left
-                        +
-                        (
-                            index
-                            *
-                            xStep
-                        );
-
-                }
-
-
-                const y =
-                    top
-                    +
-                    graphHeight
-                    *
-                    (
-                        1
-                        -
-                        (
-                            point.time
-                            /
-                            maxTime
-                        )
-                    );
-
-
-                // Point
-
-                ctx.beginPath();
-
-                ctx.arc(
-                    x,
-                    y,
-                    5,
-                    0,
-                    2 * Math.PI
-                );
-
-
-                if (
-                    point.type === "HIT"
-                ) {
-
-                    ctx.fillStyle =
-                        "#15803d";
-
-                }
-
-                else {
-
-                    ctx.fillStyle =
-                        "#dc2626";
-
-                }
-
-
-                ctx.fill();
-
-
-                // Request number
-
-                ctx.fillStyle =
-                    "#6b7280";
-
-                ctx.font =
-                    "11px Arial";
-
-                ctx.textAlign =
-                    "center";
-
-
-                ctx.fillText(
-                    index + 1,
-                    x,
-                    height - bottom + 18
-                );
-
-            }
-        );
-
-
-        // --------------------------------------------------
-        // LEGEND
-        // --------------------------------------------------
-
-        const legendY =
-            18;
-
-
-        // HIT
-
-        ctx.beginPath();
-
-        ctx.arc(
-            width - 170,
-            legendY,
-            5,
-            0,
-            2 * Math.PI
-        );
-
-        ctx.fillStyle =
-            "#15803d";
-
-        ctx.fill();
-
-
-        ctx.fillStyle =
-            "#374151";
-
-        ctx.font =
-            "12px Arial";
-
-        ctx.textAlign =
-            "left";
-
-        ctx.fillText(
-            "Cache HIT",
-            width - 160,
-            legendY + 4
-        );
-
-
-        // MISS
-
-        ctx.beginPath();
-
-        ctx.arc(
-            width - 75,
-            legendY,
-            5,
-            0,
-            2 * Math.PI
-        );
-
-        ctx.fillStyle =
-            "#dc2626";
-
-        ctx.fill();
-
-
-        ctx.fillStyle =
-            "#374151";
-
-        ctx.fillText(
-            "Cache MISS",
-            width - 65,
-            legendY + 4
-        );
 
     }
 
 
-
-    // --------------------------------------------------
-    // UPDATE STATISTICS
-    // --------------------------------------------------
+    /* ================= STATISTICS ================= */
 
     async function updateStats() {
 
@@ -1509,7 +1666,7 @@
 
 
             lines.forEach(
-                function(line) {
+                line => {
 
                     if (
                         line.startsWith(
@@ -1520,8 +1677,9 @@
                         document.getElementById(
                             "totalQueries"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1535,8 +1693,9 @@
                         document.getElementById(
                             "cacheHits"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1550,8 +1709,9 @@
                         document.getElementById(
                             "cacheMisses"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1565,8 +1725,9 @@
                         document.getElementById(
                             "hitRatio"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1580,8 +1741,9 @@
                         document.getElementById(
                             "dnsQueries"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1593,10 +1755,11 @@
                     ) {
 
                         document.getElementById(
-                            "averageTime"
+                            "avgTime"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1605,17 +1768,14 @@
                         line.startsWith(
                             "Cache Size:"
                         )
-                        &&
-                        !line.startsWith(
-                            "Maximum Cache Size:"
-                        )
                     ) {
 
                         document.getElementById(
-                            "currentCacheSize"
+                            "cacheSize"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1627,10 +1787,11 @@
                     ) {
 
                         document.getElementById(
-                            "maximumCacheSize"
+                            "maxCache"
                         ).textContent =
-                            line.split(":")[1]
-                            .trim();
+                            line
+                                .split(":")[1]
+                                .trim();
 
                     }
 
@@ -1641,9 +1802,8 @@
 
         catch (error) {
 
-            console.error(
-                "Unable to update statistics:",
-                error
+            console.log(
+                "Unable to update statistics."
             );
 
         }
@@ -1651,10 +1811,7 @@
     }
 
 
-
-    // --------------------------------------------------
-    // CLEAR CACHE
-    // --------------------------------------------------
+    /* ================= CLEAR CACHE ================= */
 
     async function clearCache() {
 
@@ -1673,7 +1830,7 @@
                 await response.json();
 
 
-            showManagementMessage(
+            showToast(
                 data.message
             );
 
@@ -1684,8 +1841,8 @@
 
         catch (error) {
 
-            showManagementMessage(
-                "Error clearing cache."
+            showToast(
+                "Unable to clear cache."
             );
 
         }
@@ -1693,23 +1850,27 @@
     }
 
 
-
-    // --------------------------------------------------
-    // SET CACHE SIZE
-    // --------------------------------------------------
+    /* ================= SET CACHE SIZE ================= */
 
     async function setCacheSize() {
 
-        const size =
+        const input =
             document.getElementById(
                 "cacheSizeInput"
-            ).value;
+            );
 
 
-        if (!size || size <= 0) {
+        const size =
+            input.value.trim();
 
-            alert(
-                "Please enter a valid cache size."
+
+        if (
+            !size ||
+            parseInt(size) <= 0
+        ) {
+
+            showToast(
+                "Enter a valid cache size."
             );
 
             return;
@@ -1730,9 +1891,11 @@
                                 "application/json"
                         },
 
-                        body: JSON.stringify({
-                            size: size
-                        })
+                        body:
+                            JSON.stringify({
+                                size:
+                                    parseInt(size)
+                            })
                     }
                 );
 
@@ -1743,7 +1906,7 @@
 
             if (data.error) {
 
-                showManagementMessage(
+                showToast(
                     data.error
                 );
 
@@ -1752,7 +1915,7 @@
             }
 
 
-            showManagementMessage(
+            showToast(
                 data.message
             );
 
@@ -1763,8 +1926,8 @@
 
         catch (error) {
 
-            showManagementMessage(
-                "Error setting cache size."
+            showToast(
+                "Unable to change cache size."
             );
 
         }
@@ -1772,35 +1935,445 @@
     }
 
 
+    /* ================= GRAPH ================= */
 
-    // --------------------------------------------------
-    // SHOW MANAGEMENT MESSAGE
-    // --------------------------------------------------
+    function drawGraph() {
 
-    function showManagementMessage(
-        message
-    ) {
-
-        const element =
+        const canvas =
             document.getElementById(
-                "managementMessage"
+                "responseGraph"
             );
 
 
-        element.textContent =
-            message;
+        const container =
+            canvas.parentElement;
 
 
-        element.style.display =
-            "block";
+        const width =
+            container.clientWidth;
+
+
+        const height =
+            container.clientHeight;
+
+
+        const dpr =
+            window.devicePixelRatio || 1;
+
+
+        canvas.width =
+            width * dpr;
+
+
+        canvas.height =
+            height * dpr;
+
+
+        canvas.style.width =
+            width + "px";
+
+
+        canvas.style.height =
+            height + "px";
+
+
+        const ctx =
+            canvas.getContext(
+                "2d"
+            );
+
+
+        ctx.scale(
+            dpr,
+            dpr
+        );
+
+
+        ctx.clearRect(
+            0,
+            0,
+            width,
+            height
+        );
+
+
+        if (
+            requestHistory.length ===
+            0
+        ) {
+
+            ctx.fillStyle =
+                "#687585";
+
+
+            ctx.font =
+                "13px Segoe UI, Arial";
+
+
+            ctx.textAlign =
+                "center";
+
+
+            ctx.fillText(
+                "Resolve a domain to display response-time data",
+                width / 2,
+                height / 2
+            );
+
+
+            return;
+
+        }
+
+
+        const padding = {
+
+            left: 58,
+
+            right: 25,
+
+            top: 25,
+
+            bottom: 45
+
+        };
+
+
+        const graphWidth =
+            width -
+            padding.left -
+            padding.right;
+
+
+        const graphHeight =
+            height -
+            padding.top -
+            padding.bottom;
+
+
+        const values =
+            requestHistory.map(
+                item =>
+                    item.time
+            );
+
+
+        const maxValue =
+            Math.max(
+                ...values,
+                10
+            );
+
+
+        const yMax =
+            Math.ceil(
+                maxValue / 10
+            ) * 10;
+
+
+        /* GRID */
+
+        ctx.strokeStyle =
+            "#1d2631";
+
+
+        ctx.lineWidth =
+            1;
+
+
+        for (
+            let i = 0;
+            i <= 5;
+            i++
+        ) {
+
+            const y =
+                padding.top +
+                (
+                    graphHeight / 5
+                ) * i;
+
+
+            ctx.beginPath();
+
+
+            ctx.moveTo(
+                padding.left,
+                y
+            );
+
+
+            ctx.lineTo(
+                width -
+                padding.right,
+                y
+            );
+
+
+            ctx.stroke();
+
+
+            const value =
+                yMax -
+                (
+                    yMax / 5
+                ) * i;
+
+
+            ctx.fillStyle =
+                "#687585";
+
+
+            ctx.font =
+                "10px Segoe UI, Arial";
+
+
+            ctx.textAlign =
+                "right";
+
+
+            ctx.fillText(
+                value.toFixed(0) +
+                " ms",
+                padding.left - 9,
+                y + 4
+            );
+
+        }
+
+
+        /* X AXIS */
+
+        ctx.strokeStyle =
+            "#303b48";
+
+
+        ctx.beginPath();
+
+
+        ctx.moveTo(
+            padding.left,
+            height -
+            padding.bottom
+        );
+
+
+        ctx.lineTo(
+            width -
+            padding.right,
+            height -
+            padding.bottom
+        );
+
+
+        ctx.stroke();
+
+
+        /* POINTS */
+
+        requestHistory.forEach(
+            (item, index) => {
+
+                let x;
+
+
+                if (
+                    requestHistory.length ===
+                    1
+                ) {
+
+                    x =
+                        padding.left +
+                        graphWidth / 2;
+
+                }
+
+                else {
+
+                    x =
+                        padding.left +
+                        (
+                            index /
+                            (
+                                requestHistory.length -
+                                1
+                            )
+                        ) *
+                        graphWidth;
+
+                }
+
+
+                const y =
+                    padding.top +
+                    graphHeight -
+                    (
+                        item.time /
+                        yMax
+                    ) *
+                    graphHeight;
+
+
+                /* Glow */
+
+                ctx.beginPath();
+
+
+                ctx.arc(
+                    x,
+                    y,
+                    9,
+                    0,
+                    Math.PI * 2
+                );
+
+
+                ctx.fillStyle =
+                    item.type ===
+                    "HIT"
+
+                        ? "rgba(34,197,94,0.10)"
+
+                        : "rgba(239,68,68,0.10)";
+
+
+                ctx.fill();
+
+
+                /* Main point */
+
+                ctx.beginPath();
+
+
+                ctx.arc(
+                    x,
+                    y,
+                    5,
+                    0,
+                    Math.PI * 2
+                );
+
+
+                ctx.fillStyle =
+                    item.type ===
+                    "HIT"
+
+                        ? "#22c55e"
+
+                        : "#ef4444";
+
+
+                ctx.fill();
+
+
+                ctx.strokeStyle =
+                    "#0b1016";
+
+
+                ctx.lineWidth =
+                    2;
+
+
+                ctx.stroke();
+
+            }
+        );
+
+
+        /* X LABELS */
+
+        ctx.fillStyle =
+            "#687585";
+
+
+        ctx.font =
+            "10px Segoe UI, Arial";
+
+
+        ctx.textAlign =
+            "center";
+
+
+        requestHistory.forEach(
+            (item, index) => {
+
+                if (
+                    requestHistory.length <=
+                    10 ||
+                    index % 2 === 0
+                ) {
+
+                    let x;
+
+
+                    if (
+                        requestHistory.length ===
+                        1
+                    ) {
+
+                        x =
+                            padding.left +
+                            graphWidth / 2;
+
+                    }
+
+                    else {
+
+                        x =
+                            padding.left +
+                            (
+                                index /
+                                (
+                                    requestHistory.length -
+                                    1
+                                )
+                            ) *
+                            graphWidth;
+
+                    }
+
+
+                    ctx.fillText(
+                        index + 1,
+                        x,
+                        height - 20
+                    );
+
+                }
+
+            }
+        );
+
+
+        /* Y LABEL */
+
+        ctx.save();
+
+
+        ctx.translate(
+            14,
+            height / 2
+        );
+
+
+        ctx.rotate(
+            -Math.PI / 2
+        );
+
+
+        ctx.fillText(
+            "Response Time",
+            0,
+            0
+        );
+
+
+        ctx.restore();
 
     }
 
 
-
-    // --------------------------------------------------
-    // ENTER KEY SUPPORT
-    // --------------------------------------------------
+    /* ================= ENTER KEY ================= */
 
     document.getElementById(
         "domainInput"
@@ -1809,7 +2382,8 @@
         function(event) {
 
             if (
-                event.key === "Enter"
+                event.key ===
+                "Enter"
             ) {
 
                 resolveDomain();
@@ -1820,18 +2394,22 @@
     );
 
 
+    /* ================= RESIZE ================= */
 
-    // --------------------------------------------------
-    // INITIAL LOAD
-    // --------------------------------------------------
+    window.addEventListener(
+        "resize",
+        drawGraph
+    );
+
+
+    /* ================= INITIAL LOAD ================= */
 
     updateStats();
 
     drawGraph();
 
-
 </script>
 
 </body>
-
 </html>
+```
