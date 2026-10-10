@@ -10,6 +10,16 @@ PORT = 5000
 cache = {}
 
 MAX_CACHE_SIZE = 10
+MIN_CACHE_SIZE = 3
+MAX_ALLOWED_CACHE_SIZE = 20
+
+ADAPTIVE_WINDOW_SIZE = 10
+
+LOW_HIT_RATIO = 30.0
+HIGH_HIT_RATIO = 75.0
+
+adaptive_queries = 0
+adaptive_hits = 0
 
 
 total_queries = 0
@@ -26,6 +36,8 @@ def resolve_domain(domain):
     global cache_misses
     global dns_queries
     global total_dns_response_time
+    global adaptive_queries
+    global adaptive_hits
 
     total_queries += 1
 
@@ -43,6 +55,9 @@ def resolve_domain(domain):
         if current_time < cache_entry["expiry"]:
 
             cache_hits += 1
+
+            adaptive_queries += 1
+            adaptive_hits += 1
 
             # Increase popularity count
             cache_entry["frequency"] += 1
@@ -78,6 +93,8 @@ def resolve_domain(domain):
 
     cache_misses += 1
     dns_queries += 1
+
+    adaptive_queries += 1
 
     try:
 
@@ -170,83 +187,139 @@ def resolve_domain(domain):
         )
 
 
+
+def adapt_cache_size():
+
+    global MAX_CACHE_SIZE
+    global adaptive_queries
+    global adaptive_hits
+
+    # Wait until one evaluation window is complete
+    if adaptive_queries < ADAPTIVE_WINDOW_SIZE:
+        return None
+
+    hit_ratio = (
+        adaptive_hits / adaptive_queries
+    ) * 100
+
+    print(
+        "Adaptive evaluation:",
+        adaptive_queries,
+        "requests, hit_ratio:",
+        round(hit_ratio, 2),
+        "%"
+    )
+
+    old_size = MAX_CACHE_SIZE
+
+    # Increase capacity when cache performance is high
+    if hit_ratio > HIGH_HIT_RATIO:
+
+        MAX_CACHE_SIZE = min(
+            MAX_CACHE_SIZE + 2,
+            MAX_ALLOWED_CACHE_SIZE
+        )
+
+    # Reduce capacity when cache performance is low
+    elif hit_ratio < LOW_HIT_RATIO:
+
+        MAX_CACHE_SIZE = max(
+            MAX_CACHE_SIZE - 2,
+            MIN_CACHE_SIZE
+        )
+
+    # Reset the evaluation window
+    adaptive_queries = 0
+    adaptive_hits = 0
+
+    if MAX_CACHE_SIZE != old_size:
+
+        print(
+            "Adaptive cache size changed:",
+            old_size,
+            "->",
+            MAX_CACHE_SIZE,
+            "| Hit ratio:",
+            round(hit_ratio, 2),
+            "%"
+        )
+
+        # Remove entries if the cache exceeds the new capacity
+        while len(cache) > MAX_CACHE_SIZE:
+
+            domain_to_remove = (
+                select_cache_entry_for_replacement()
+            )
+
+            if domain_to_remove is None:
+                break
+
+            del cache[domain_to_remove]
+
+        return (
+            "Cache size changed from "
+            + str(old_size)
+            + " to "
+            + str(MAX_CACHE_SIZE)
+        )
+
+    return None
+
+
 def select_cache_entry_for_replacement():
 
     current_time = time.time()
 
-    worst_domain = None
+    # Remove expired entries first
+    for domain, entry in list(cache.items()):
 
-    worst_score = float("inf")
+        if current_time >= entry["expiry"]:
+            del cache[domain]
 
-    # --------------------------------------------------
-    # CALCULATE SCORE FOR EACH CACHE ENTRY
-    # --------------------------------------------------
+    # If removing expired entries created space,
+    # no additional replacement is needed.
+    if len(cache) < MAX_CACHE_SIZE:
+        return None
+
+    scores = {}
 
     for domain, entry in cache.items():
 
-        # Remaining TTL
-        remaining_ttl = (
-            entry["expiry"]
-            - current_time
-        )
-
-        if remaining_ttl < 0:
-
-            remaining_ttl = 0
-
-        # Time since last access
-        age = (
-            current_time
-            - entry["last_access"]
-        )
-
-        # Number of requests
+        # Popularity: more requests means more useful
         frequency = entry["frequency"]
+        popularity_score = frequency / (frequency + 1)
 
-        # --------------------------------------------------
-        # POPULARITY SCORE
-        # --------------------------------------------------
+        # Recency: recently accessed entries score higher
+        age = current_time - entry["last_access"]
+        recency_score = 1 / (1 + age)
 
-        popularity_score = frequency
-
-        # --------------------------------------------------
-        # RECENCY SCORE
-        # --------------------------------------------------
-
-        recency_score = (
-            1 / (1 + age)
+        # TTL: longer remaining lifetime scores higher
+        remaining_ttl = max(
+            0,
+            entry["expiry"] - current_time
         )
 
-        # --------------------------------------------------
-        # TTL SCORE
-        # --------------------------------------------------
+        ttl_score = remaining_ttl / (
+            remaining_ttl + 60
+        )
 
-        ttl_score = remaining_ttl
-
-        # --------------------------------------------------
-        # COMBINED INTELLIGENT SCORE
-        # --------------------------------------------------
-
+        # Combine normalized scores
         score = (
-
-            (0.5 * popularity_score)
-
-            + (0.3 * recency_score)
-
-            + (0.2 * ttl_score)
-
+            0.5 * popularity_score
+            + 0.3 * recency_score
+            + 0.2 * ttl_score
         )
 
-        # Lower score means the entry
-        # is less useful to keep.
+        scores[domain] = score
 
-        if score < worst_score:
 
-            worst_score = score
 
-            worst_domain = domain
+    # Evict the entry with the lowest score
+    if scores:
+        return min(scores, key=scores.get)
 
-    return worst_domain
+    return None
+
 
 
 def get_statistics():
@@ -504,9 +577,7 @@ while True:
     # CHANGE CACHE SIZE
     # --------------------------------------------------
 
-    elif request.lower().startswith(
-        "setsize "
-    ):
+    elif request.lower().startswith("setsize "):
 
         try:
 
@@ -518,7 +589,10 @@ while True:
 
                 raise ValueError
 
-            MAX_CACHE_SIZE = new_size
+            MAX_CACHE_SIZE = max(
+                MIN_CACHE_SIZE,
+                min(new_size, MAX_ALLOWED_CACHE_SIZE)
+            )
 
             cache.clear()
 
@@ -527,11 +601,12 @@ while True:
                 + str(MAX_CACHE_SIZE)
             )
 
-        except:
+        except Exception as e:
+            print("Setsize error:" , repr(e))
+            response = "Invalid cache size : " + str(e)
 
-            response = (
-                "Invalid cache size"
-            )
+
+
 
     # --------------------------------------------------
     # DNS REQUEST
@@ -542,7 +617,6 @@ while True:
         response = resolve_domain(
             request
         )
-
     # --------------------------------------------------
     # SEND RESPONSE
     # --------------------------------------------------
@@ -551,3 +625,11 @@ while True:
         response.encode(),
         client_address
     )
+
+    if request.lower() not in (
+        "stats",
+        "cache",
+        "clear"
+    ) and not request.lower().startswith("setsize"):
+
+      adapt_cache_size()
