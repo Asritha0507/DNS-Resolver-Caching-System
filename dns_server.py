@@ -1,36 +1,137 @@
 import socket
-import dns.resolver
 import time
+import dns.resolver
 
+
+# --------------------------------------------------
+# SERVER CONFIGURATION
+# --------------------------------------------------
 
 HOST = "127.0.0.1"
 PORT = 5000
 
-
-cache = {}
-
-MAX_CACHE_SIZE = 10
 MIN_CACHE_SIZE = 3
+MAX_CACHE_SIZE = 10
 MAX_ALLOWED_CACHE_SIZE = 20
 
 ADAPTIVE_WINDOW_SIZE = 10
-
 LOW_HIT_RATIO = 30.0
 HIGH_HIT_RATIO = 75.0
 
+cache = {}
+
 adaptive_queries = 0
 adaptive_hits = 0
-
 
 total_queries = 0
 cache_hits = 0
 cache_misses = 0
 dns_queries = 0
-total_dns_response_time = 0
+total_dns_response_time = 0.0
 
+
+# --------------------------------------------------
+# CACHE HELPERS
+# --------------------------------------------------
+
+def remove_expired_entries():
+    """Remove entries whose DNS TTL has expired."""
+    current_time = time.time()
+
+    expired_domains = [
+        domain
+        for domain, entry in cache.items()
+        if current_time >= entry["expiry"]
+    ]
+
+    for domain in expired_domains:
+        del cache[domain]
+
+    return len(expired_domains)
+
+
+def select_cache_entry_for_replacement():
+    """
+    Select the least useful entry using popularity,
+    recency, and remaining TTL.
+    """
+    remove_expired_entries()
+
+    if not cache:
+        return None
+
+    current_time = time.time()
+    scores = {}
+
+    for domain, entry in cache.items():
+        frequency = entry["frequency"]
+        popularity_score = frequency / (frequency + 1)
+
+        age = max(
+            0.0,
+            current_time - entry["last_access"]
+        )
+        recency_score = 1 / (1 + age)
+
+        remaining_ttl = max(
+            0.0,
+            entry["expiry"] - current_time
+        )
+        ttl_score = remaining_ttl / (remaining_ttl + 60)
+
+        # Higher score means the entry is more valuable.
+        scores[domain] = (
+            0.5 * popularity_score
+            + 0.3 * recency_score
+            + 0.2 * ttl_score
+        )
+
+    if scores:
+        return min(scores, key=scores.get)
+
+    return None
+
+
+def make_room_for_entry():
+    """Keep the cache within the current maximum size."""
+    remove_expired_entries()
+
+    while len(cache) >= MAX_CACHE_SIZE:
+        domain_to_remove = (
+            select_cache_entry_for_replacement()
+        )
+
+        if domain_to_remove is None:
+            break
+
+        print(
+            "Cache replacement: evicting",
+            domain_to_remove
+        )
+        del cache[domain_to_remove]
+
+
+def add_to_cache(domain, ip_address, actual_ttl):
+    """Insert a successful DNS result into the cache."""
+    make_room_for_entry()
+
+    now = time.time()
+
+    cache[domain] = {
+        "ip": ip_address,
+        "ttl": actual_ttl,
+        "expiry": now + actual_ttl,
+        "frequency": 1,
+        "last_access": now,
+        "created_at": now
+    }
+
+
+# --------------------------------------------------
+# DNS RESOLUTION
+# --------------------------------------------------
 
 def resolve_domain(domain):
-
     global total_queries
     global cache_hits
     global cache_misses
@@ -39,162 +140,83 @@ def resolve_domain(domain):
     global adaptive_queries
     global adaptive_hits
 
-    total_queries += 1
+    domain = domain.strip().lower().rstrip(".")
 
+    if not domain:
+        return "DNS resolution failed: domain name is empty"
+
+    total_queries += 1
     current_time = time.time()
 
-    # --------------------------------------------------
-    # CHECK CACHE
-    # --------------------------------------------------
+    # Check cache
+    cache_entry = cache.get(domain)
 
-    if domain in cache:
-
-        cache_entry = cache[domain]
-
-        # Check whether TTL is still valid
+    if cache_entry is not None:
         if current_time < cache_entry["expiry"]:
-
             cache_hits += 1
-
             adaptive_queries += 1
             adaptive_hits += 1
 
-            # Increase popularity count
             cache_entry["frequency"] += 1
-
-            # Update last access time
             cache_entry["last_access"] = current_time
 
             remaining_ttl = (
-                cache_entry["expiry"]
-                - current_time
+                cache_entry["expiry"] - current_time
             )
 
             return (
                 "CACHE HIT\n"
-                "Domain: " + domain + "\n"
-                "IP Address: "
-                + cache_entry["ip"]
-                + "\n"
-                "TTL Remaining: "
-                "{:.2f} seconds".format(
-                    remaining_ttl
-                )
+                f"Domain: {domain}\n"
+                f"IP Address: {cache_entry['ip']}\n"
+                f"TTL Remaining: {remaining_ttl:.2f} seconds"
             )
 
-        else:
+        # Remove expired entry
+        del cache[domain]
 
-            # Remove expired entry
-            del cache[domain]
-
-    # --------------------------------------------------
-    # CACHE MISS
-    # --------------------------------------------------
-
+    # Cache miss
     cache_misses += 1
     dns_queries += 1
-
     adaptive_queries += 1
 
     try:
-
         start_time = time.time()
 
-        answer = dns.resolver.resolve(
-            domain,
-            "A"
-        )
+        answer = dns.resolver.resolve(domain, "A")
 
         end_time = time.time()
 
-        response_time = (
-            (end_time - start_time)
-            * 1000
-        )
-
-        total_dns_response_time += (
-            response_time
-        )
+        response_time = (end_time - start_time) * 1000
+        total_dns_response_time += response_time
 
         ip_address = str(answer[0])
+        actual_ttl = int(answer.rrset.ttl)
 
-        actual_ttl = answer.rrset.ttl
-
-        expiry_time = (
-            time.time()
-            + actual_ttl
-        )
-
-        # --------------------------------------------------
-        # INTELLIGENT CACHE REPLACEMENT
-        # --------------------------------------------------
-
-        if len(cache) >= MAX_CACHE_SIZE:
-
-            domain_to_remove = (
-                select_cache_entry_for_replacement()
-            )
-
-            if domain_to_remove is not None:
-
-                del cache[
-                    domain_to_remove
-                ]
-
-        # --------------------------------------------------
-        # ADD NEW CACHE ENTRY
-        # --------------------------------------------------
-
-        cache[domain] = {
-
-            "ip": ip_address,
-
-            "ttl": actual_ttl,
-
-            "expiry": expiry_time,
-
-            # Number of times the domain
-            # has been requested
-            "frequency": 1,
-
-            # Most recent access time
-            "last_access": time.time(),
-
-            # Time when cache entry was created
-            "created_at": time.time()
-        }
+        # Cache only records with a positive TTL
+        if actual_ttl > 0:
+            add_to_cache(domain, ip_address, actual_ttl)
 
         return (
             "CACHE MISS\n"
-            "Domain: " + domain + "\n"
-            "IP Address: "
-            + ip_address
-            + "\n"
-            "Response Time: "
-            "{:.2f} ms\n".format(
-                response_time
-            )
-            + "TTL: "
-            + str(actual_ttl)
-            + " seconds"
+            f"Domain: {domain}\n"
+            f"IP Address: {ip_address}\n"
+            f"Response Time: {response_time:.2f} ms\n"
+            f"TTL: {actual_ttl} seconds"
         )
 
-    except Exception as e:
-
-        return (
-            "DNS resolution failed: "
-            + str(e)
-        )
+    except Exception as exc:
+        return f"DNS resolution failed: {exc}"
 
 
+# --------------------------------------------------
+# ADAPTIVE CACHE SIZE
+# --------------------------------------------------
 
 def adapt_cache_size():
-
     global MAX_CACHE_SIZE
     global adaptive_queries
     global adaptive_hits
 
-    # Wait until one evaluation window is complete
     if adaptive_queries < ADAPTIVE_WINDOW_SIZE:
         return None
 
@@ -214,7 +236,6 @@ def adapt_cache_size():
 
     # Increase capacity when cache performance is high
     if hit_ratio > HIGH_HIT_RATIO:
-
         MAX_CACHE_SIZE = min(
             MAX_CACHE_SIZE + 2,
             MAX_ALLOWED_CACHE_SIZE
@@ -222,7 +243,6 @@ def adapt_cache_size():
 
     # Reduce capacity when cache performance is low
     elif hit_ratio < LOW_HIT_RATIO:
-
         MAX_CACHE_SIZE = max(
             MAX_CACHE_SIZE - 2,
             MIN_CACHE_SIZE
@@ -232,404 +252,275 @@ def adapt_cache_size():
     adaptive_queries = 0
     adaptive_hits = 0
 
-    if MAX_CACHE_SIZE != old_size:
-
-        print(
-            "Adaptive cache size changed:",
-            old_size,
-            "->",
-            MAX_CACHE_SIZE,
-            "| Hit ratio:",
-            round(hit_ratio, 2),
-            "%"
-        )
-
-        # Remove entries if the cache exceeds the new capacity
-        while len(cache) > MAX_CACHE_SIZE:
-
-            domain_to_remove = (
-                select_cache_entry_for_replacement()
-            )
-
-            if domain_to_remove is None:
-                break
-
-            del cache[domain_to_remove]
-
-        return (
-            "Cache size changed from "
-            + str(old_size)
-            + " to "
-            + str(MAX_CACHE_SIZE)
-        )
-
-    return None
-
-
-def select_cache_entry_for_replacement():
-
-    current_time = time.time()
-
-    # Remove expired entries first
-    for domain, entry in list(cache.items()):
-
-        if current_time >= entry["expiry"]:
-            del cache[domain]
-
-    # If removing expired entries created space,
-    # no additional replacement is needed.
-    if len(cache) < MAX_CACHE_SIZE:
+    if MAX_CACHE_SIZE == old_size:
         return None
 
-    scores = {}
+    print(
+        "Adaptive cache size changed:",
+        old_size,
+        "->",
+        MAX_CACHE_SIZE,
+        "| Hit ratio:",
+        round(hit_ratio, 2),
+        "%"
+    )
 
-    for domain, entry in cache.items():
+    # Remove entries if cache exceeds the new capacity
+    remove_expired_entries()
 
-        # Popularity: more requests means more useful
-        frequency = entry["frequency"]
-        popularity_score = frequency / (frequency + 1)
-
-        # Recency: recently accessed entries score higher
-        age = current_time - entry["last_access"]
-        recency_score = 1 / (1 + age)
-
-        # TTL: longer remaining lifetime scores higher
-        remaining_ttl = max(
-            0,
-            entry["expiry"] - current_time
+    while len(cache) > MAX_CACHE_SIZE:
+        domain_to_remove = (
+            select_cache_entry_for_replacement()
         )
 
-        ttl_score = remaining_ttl / (
-            remaining_ttl + 60
+        if domain_to_remove is None:
+            break
+
+        print(
+            "Adaptive resizing: evicting",
+            domain_to_remove
         )
+        del cache[domain_to_remove]
 
-        # Combine normalized scores
-        score = (
-            0.5 * popularity_score
-            + 0.3 * recency_score
-            + 0.2 * ttl_score
-        )
-
-        scores[domain] = score
+    return (
+        f"Cache size changed from {old_size} "
+        f"to {MAX_CACHE_SIZE}"
+    )
 
 
-
-    # Evict the entry with the lowest score
-    if scores:
-        return min(scores, key=scores.get)
-
-    return None
-
-
+# --------------------------------------------------
+# STATISTICS
+# --------------------------------------------------
 
 def get_statistics():
-
-    result = "\n"
-
-    result += (
-        "===================================\n"
-    )
-
-    result += (
-        "       DNS RESOLVER STATISTICS\n"
-    )
-
-    result += (
-        "===================================\n"
-    )
-
-    result += (
-        "Total Queries: "
-        + str(total_queries)
-        + "\n"
-    )
-
-    result += (
-        "Cache Hits: "
-        + str(cache_hits)
-        + "\n"
-    )
-
-    result += (
-        "Cache Misses: "
-        + str(cache_misses)
-        + "\n"
-    )
-
-    result += (
-        "DNS Queries Sent: "
-        + str(dns_queries)
-        + "\n"
-    )
+    lines = [
+        "",
+        "===================================",
+        "       DNS RESOLVER STATISTICS",
+        "===================================",
+        f"Total Queries: {total_queries}",
+        f"Cache Hits: {cache_hits}",
+        f"Cache Misses: {cache_misses}",
+        f"DNS Queries Sent: {dns_queries}"
+    ]
 
     if total_queries > 0:
-
         hit_ratio = (
-            cache_hits
-            / total_queries
+            cache_hits / total_queries
         ) * 100
 
-        result += (
-            "Cache Hit Ratio: "
-            "{:.2f}%\n".format(
-                hit_ratio
-            )
+        lines.append(
+            f"Cache Hit Ratio: {hit_ratio:.2f}%"
         )
 
     if dns_queries > 0:
-
         average_time = (
-            total_dns_response_time
-            / dns_queries
+            total_dns_response_time / dns_queries
         )
 
-        result += (
-            "Average DNS Response Time: "
-            "{:.2f} ms\n".format(
-                average_time
-            )
+        lines.append(
+            f"Average DNS Response Time: {average_time:.2f} ms"
         )
 
-    result += (
-        "Cache Size: "
-        + str(len(cache))
-        + "\n"
-    )
+    remove_expired_entries()
 
-    result += (
-        "Maximum Cache Size: "
-        + str(MAX_CACHE_SIZE)
-        + "\n"
-    )
-
-    result += (
+    lines.extend([
+        f"Cache Size: {len(cache)}",
+        f"Maximum Cache Size: {MAX_CACHE_SIZE}",
         "==================================="
-    )
+    ])
 
-    return result
+    return "\n".join(lines)
 
+
+# --------------------------------------------------
+# CACHE CONTENTS
+# --------------------------------------------------
 
 def get_cache_contents():
-
+    remove_expired_entries()
     current_time = time.time()
 
-    result = "\n"
+    lines = [
+        "",
+        "===================================",
+        "          CACHE CONTENTS",
+        "==================================="
+    ]
 
-    result += (
-        "===================================\n"
-    )
-
-    result += (
-        "          CACHE CONTENTS\n"
-    )
-
-    result += (
-        "===================================\n"
-    )
-
-    if len(cache) == 0:
-
-        result += (
-            "Cache is empty\n"
-        )
+    if not cache:
+        lines.append("Cache is empty")
 
     else:
-
         for domain, entry in cache.items():
-
-            remaining_ttl = (
-                entry["expiry"]
-                - current_time
+            remaining_ttl = max(
+                0.0,
+                entry["expiry"] - current_time
             )
 
-            if remaining_ttl < 0:
-
-                remaining_ttl = 0
-
-            result += (
-                "Domain: "
-                + domain
-                + "\n"
+            last_access = time.strftime(
+                "%H:%M:%S",
+                time.localtime(entry["last_access"])
             )
 
-            result += (
-                "IP Address: "
-                + entry["ip"]
-                + "\n"
-            )
+            lines.extend([
+                f"Domain: {domain}",
+                f"IP Address: {entry['ip']}",
+                f"Frequency: {entry['frequency']}",
+                f"TTL Remaining: {remaining_ttl:.2f} seconds",
+                f"Last Access: {last_access}",
+                "-----------------------------------"
+            ])
 
-            result += (
-                "Frequency: "
-                + str(entry["frequency"])
-                + "\n"
-            )
+    lines.append("===================================")
 
-            result += (
-                "TTL Remaining: "
-                "{:.2f} seconds\n".format(
-                    remaining_ttl
-                )
-            )
-
-            result += (
-                "Last Access: "
-                + time.strftime(
-                    "%H:%M:%S",
-                    time.localtime(
-                        entry["last_access"]
-                    )
-                )
-                + "\n"
-            )
-
-            result += (
-                "-----------------------------------\n"
-            )
-
-    result += (
-        "==================================="
-    )
-
-    return result
+    return "\n".join(lines)
 
 
 # --------------------------------------------------
-# CREATE UDP SOCKET
+# RESET STATISTICS
 # --------------------------------------------------
 
-server_socket = socket.socket(
-    socket.AF_INET,
-    socket.SOCK_DGRAM
-)
+def reset_statistics():
+    global total_queries
+    global cache_hits
+    global cache_misses
+    global dns_queries
+    global total_dns_response_time
+    global adaptive_queries
+    global adaptive_hits
 
-
-server_socket.bind(
-    (HOST, PORT)
-)
-
-
-print(
-    "DNS Resolver Server started"
-)
-
-print(
-    "Listening on",
-    HOST,
-    "port",
-    PORT
-)
-
-print(
-    "Maximum Cache Size:",
-    MAX_CACHE_SIZE
-)
+    total_queries = 0
+    cache_hits = 0
+    cache_misses = 0
+    dns_queries = 0
+    total_dns_response_time = 0.0
+    adaptive_queries = 0
+    adaptive_hits = 0
 
 
 # --------------------------------------------------
 # MAIN SERVER LOOP
 # --------------------------------------------------
 
-while True:
+def main():
+    global MAX_CACHE_SIZE
 
-    data, client_address = (
-        server_socket.recvfrom(1024)
+    server_socket = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_DGRAM
     )
 
-    request = (
-        data.decode()
-        .strip()
-    )
+    try:
+        server_socket.bind((HOST, PORT))
 
-    print(
-        "\nRequest received:",
-        request
-    )
+    except OSError as exc:
+        server_socket.close()
 
-    # --------------------------------------------------
-    # STATISTICS COMMAND
-    # --------------------------------------------------
-
-    if request.lower() == "stats":
-
-        response = get_statistics()
-
-    # --------------------------------------------------
-    # CACHE CONTENTS COMMAND
-    # --------------------------------------------------
-
-    elif request.lower() == "cache":
-
-        response = get_cache_contents()
-
-    # --------------------------------------------------
-    # CLEAR CACHE COMMAND
-    # --------------------------------------------------
-
-    elif request.lower() == "clear":
-
-        cache.clear()
-
-        response = (
-            "Cache cleared successfully"
+        print(
+            f"Could not bind to {HOST}:{PORT}: {exc}"
         )
-
-    # --------------------------------------------------
-    # CHANGE CACHE SIZE
-    # --------------------------------------------------
-
-    elif request.lower().startswith("setsize "):
-
-        try:
-
-            new_size = int(
-                request.split()[1]
-            )
-
-            if new_size <= 0:
-
-                raise ValueError
-
-            MAX_CACHE_SIZE = max(
-                MIN_CACHE_SIZE,
-                min(new_size, MAX_ALLOWED_CACHE_SIZE)
-            )
-
-            cache.clear()
-
-            response = (
-                "Maximum cache size set to "
-                + str(MAX_CACHE_SIZE)
-            )
-
-        except Exception as e:
-            print("Setsize error:" , repr(e))
-            response = "Invalid cache size : " + str(e)
-
-
-
-
-    # --------------------------------------------------
-    # DNS REQUEST
-    # --------------------------------------------------
-
-    else:
-
-        response = resolve_domain(
-            request
+        print(
+            "Check whether another DNS server is already using port",
+            PORT
         )
-    # --------------------------------------------------
-    # SEND RESPONSE
-    # --------------------------------------------------
+        return
 
-    server_socket.sendto(
-        response.encode(),
-        client_address
-    )
+    print("DNS Resolver Server started")
+    print("Listening on", HOST, "port", PORT)
+    print("Maximum Cache Size:", MAX_CACHE_SIZE)
 
-    if request.lower() not in (
-        "stats",
-        "cache",
-        "clear"
-    ) and not request.lower().startswith("setsize"):
+    try:
+        while True:
+            data, client_address = server_socket.recvfrom(1024)
 
-      adapt_cache_size()
+            request = data.decode(
+                errors="replace"
+            ).strip()
+
+            command = request.lower()
+
+            print("\nRequest received:", request)
+
+            if command == "stats":
+                response = get_statistics()
+
+            elif command == "cache":
+                response = get_cache_contents()
+
+            elif command == "clear":
+                cache.clear()
+                response = "Cache cleared successfully"
+
+            elif command.startswith("setsize "):
+                try:
+                    parts = request.split()
+
+                    if len(parts) != 2:
+                        raise ValueError(
+                            "use: setsize <number>"
+                        )
+
+                    new_size = int(parts[1])
+
+                    if new_size <= 0:
+                        raise ValueError(
+                            "cache size must be positive"
+                        )
+
+                    old_size = MAX_CACHE_SIZE
+
+                    MAX_CACHE_SIZE = max(
+                        MIN_CACHE_SIZE,
+                        min(
+                            new_size,
+                            MAX_ALLOWED_CACHE_SIZE
+                        )
+                    )
+
+                    while len(cache) > MAX_CACHE_SIZE:
+                        domain_to_remove = (
+                            select_cache_entry_for_replacement()
+                        )
+
+                        if domain_to_remove is None:
+                            break
+
+                        print(
+                            "Manual resizing: evicting",
+                            domain_to_remove
+                        )
+                        del cache[domain_to_remove]
+
+                    response = (
+                        f"Maximum cache size set to {MAX_CACHE_SIZE} "
+                        f"(previously {old_size})"
+                    )
+
+                except (ValueError, IndexError) as exc:
+                    response = f"Invalid cache size: {exc}"
+
+            elif command == "resetstats":
+                reset_statistics()
+                response = "Statistics reset successfully"
+
+            else:
+                response = resolve_domain(request)
+
+                # Evaluate after each DNS request
+                adapt_cache_size()
+
+            server_socket.sendto(
+                response.encode(),
+                client_address
+            )
+
+    except KeyboardInterrupt:
+        print("\nDNS Resolver Server stopped")
+
+    finally:
+        server_socket.close()
+
+
+if __name__ == "__main__":
+    main()
